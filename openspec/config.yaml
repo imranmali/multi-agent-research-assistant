@@ -1,0 +1,46 @@
+schema: spec-driven
+
+context: |
+  Python 3.11+ service (FastAPI, asyncio, Pydantic v2). Package lives in src/research_assistant.
+  LLM provider is Anthropic Claude via the official `anthropic` SDK; a deterministic offline
+  "mock" provider must always exist so tests and CI never need network access or API keys.
+  Must scale horizontally: API processes are stateless, job state lives in a shared store (Redis),
+  and long-running research runs in separate worker processes.
+  Quality gates: ruff (lint + format), mypy (strict on src), pytest with >= 85% coverage.
+
+rules:
+  tasks:
+    - Every task states how it is verified (test, command, or artifact)
+  proposal:
+    - State what is out of scope
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
