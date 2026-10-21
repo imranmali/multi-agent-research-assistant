@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a new capability or an improvement.
+title: "feat: "
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Accepted features are specified as an OpenSpec change (`openspec/changes/<name>/`)
+        before implementation. Describing the problem well here makes that step quick.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and why is it hard today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: The behaviour you would like, ideally as WHEN / THEN scenarios.
+      placeholder: |
+        WHEN a client ...
+        THEN the API ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Agents / research pipeline
+        - HTTP API
+        - Jobs / workers / Redis
+        - CLI
+        - Deployment (Docker / Kubernetes)
+        - CI/CD
+        - Documentation
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request (including the OpenSpec change).

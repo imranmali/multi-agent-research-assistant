@@ -1,0 +1,32 @@
+# Apply with:  kubectl apply -k deploy/k8s
+# Secrets are NOT part of this kustomization; create them first (see secret.example.yaml):
+#   kubectl -n research-assistant create secret generic research-assistant-secrets \
+#     --from-literal=ANTHROPIC_API_KEY=sk-ant-... --from-literal=API_KEYS=<key1>,<key2>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: research-assistant
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: multi-agent-research-assistant
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - redis.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - worker-deployment.yaml
+  - hpa.yaml
+  - pdb.yaml
+  # Expose the API outside the cluster (edit host / ingress class / TLS first):
+  # - ingress.yaml
+
+# Pin a released version (or digest) instead of `latest` in production, e.g.:
+#   kustomize edit set image ghcr.io/imranmali/multi-agent-research-assistant:1.0.0
+images:
+  - name: ghcr.io/imranmali/multi-agent-research-assistant
+    newTag: latest
