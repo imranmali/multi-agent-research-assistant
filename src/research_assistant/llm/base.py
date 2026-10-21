@@ -47,14 +47,11 @@ class LLMClient(Protocol):
         self, *, system: str, prompt: str, max_tokens: int | None = None
     ) -> LLMResult:
         """Single-turn text generation without tools."""
-        ...
 
     async def research(
         self, *, system: str, prompt: str, max_tokens: int | None = None
     ) -> LLMResult:
         """Generation grounded in live web search; returns the sources that were consulted."""
-        ...
 
     async def aclose(self) -> None:
         """Release network resources."""
-        ...

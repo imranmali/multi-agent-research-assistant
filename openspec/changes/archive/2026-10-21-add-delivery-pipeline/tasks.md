@@ -2,12 +2,12 @@
 
 ## 1. Container packaging
 
-- [ ] 1.1 Multi-stage non-root `Dockerfile` with healthcheck and `.dockerignore`; verify `docker build` succeeds
+- [x] 1.1 Multi-stage non-root `Dockerfile` with healthcheck and `.dockerignore`; verify `docker build` succeeds
 - [x] 1.2 `docker-compose.yml` (api, worker, redis); verify `docker compose config` is valid
 
 ## 2. Continuous integration
 
-- [ ] 2.1 `ci.yml`: lint, format, mypy, pytest matrix + coverage, openspec validate, docker build + smoke test; verify green on the pull request
+- [x] 2.1 `ci.yml`: lint, format, mypy, pytest matrix + coverage, openspec validate, docker build + smoke test; verify green on the pull request
 - [x] 2.2 Dependabot and CodeQL configuration; verify files parse (actionlint/yamllint)
 
 ## 3. Continuous delivery
