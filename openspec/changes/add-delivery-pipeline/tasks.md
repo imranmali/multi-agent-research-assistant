@@ -17,7 +17,7 @@
 
 ## 4. Documentation and licensing
 
-- [ ] 4.1 README (architecture, quickstart, API, config, deployment), CONTRIBUTING, SECURITY, CHANGELOG; verify links/commands by running the quickstart
+- [x] 4.1 README (architecture, quickstart, API, config, deployment), CONTRIBUTING, SECURITY, CHANGELOG; verify links/commands by running the quickstart
 - [x] 4.2 MIT `LICENSE`, PR and issue templates; verify files present
 
 ## Workflow follow-up
