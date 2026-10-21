@@ -11,6 +11,8 @@
 - [x] 2.1 Implement in-process `JobRunner` with bounded concurrency; verify runner tests
 - [x] 2.2 Implement `research-worker` with bounded concurrency and graceful SIGTERM shutdown; verify `tests/unit/test_worker.py`
 
+- [x] 2.3 Heartbeat-based recovery of jobs held by crashed workers; verify `tests/unit/test_recovery.py`
+
 ## 3. HTTP API
 
 - [x] 3.1 Implement `create_app` with `/v1/research` submit/get/list/cancel and validation; verify `tests/api/test_research_routes.py`

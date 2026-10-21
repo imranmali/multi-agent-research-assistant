@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from typing import Protocol, TypeVar, runtime_checkable
 
 from redis.asyncio import Redis
 
-__all__ = ["InMemoryJobQueue", "JobQueue", "RedisJobQueue"]
+__all__ = ["InMemoryJobQueue", "JobQueue", "RecoverableJobQueue", "RedisJobQueue"]
 
 
 @runtime_checkable
@@ -29,6 +29,23 @@ class JobQueue(Protocol):
 
     async def aclose(self) -> None:
         """Release resources."""
+        ...
+
+
+@runtime_checkable
+class RecoverableJobQueue(JobQueue, Protocol):
+    """A shared queue whose consumers can die; live consumers re-queue what dead ones held."""
+
+    async def heartbeat(self, ttl_seconds: float) -> None:
+        """Announce this consumer is alive for the next ``ttl_seconds``."""
+        ...
+
+    async def clear_heartbeat(self) -> None:
+        """Withdraw the liveness announcement (clean shutdown)."""
+        ...
+
+    async def recover_orphaned(self, on_recover: Callable[[str], Awaitable[None]]) -> list[str]:
+        """Re-queue ids held by consumers without a heartbeat, calling ``on_recover`` first."""
         ...
 
 
@@ -81,6 +98,7 @@ class RedisJobQueue:
         self.name = name
         self.consumer_id = consumer_id
         self.processing_key = f"{name}:processing:{consumer_id}"
+        self.heartbeat_key = self._heartbeat_key(consumer_id)
         self._owns_client = owns_client
 
     async def enqueue(self, job_id: str) -> None:
@@ -118,6 +136,46 @@ class RedisJobQueue:
     async def in_flight(self) -> list[str]:
         """Ids this consumer has dequeued but not yet acknowledged."""
         return [_text(r) for r in await _resolve(self._redis.lrange(self.processing_key, 0, -1))]
+
+    def _heartbeat_key(self, consumer_id: str) -> str:
+        return f"{self.name}:heartbeat:{consumer_id}"
+
+    async def heartbeat(self, ttl_seconds: float) -> None:
+        await self._redis.set(self.heartbeat_key, "1", px=max(int(ttl_seconds * 1000), 1))
+
+    async def clear_heartbeat(self) -> None:
+        await self._redis.delete(self.heartbeat_key)
+
+    async def recover_orphaned(self, on_recover: Callable[[str], Awaitable[None]]) -> list[str]:
+        """Move ids out of processing lists whose consumer stopped heartbeating.
+
+        Each id is first claimed atomically into this consumer's own processing list, so
+        concurrent recoverers never handle the same id. ``on_recover`` then runs (the worker
+        resets the job to ``queued``) *before* the id is pushed back to the head of the
+        queue, so no consumer can dequeue it while the store still says ``running``. If this
+        consumer dies mid-way, the id stays in its processing list and is recovered later.
+        """
+        prefix = f"{self.name}:processing:"
+        recovered: list[str] = []
+        async for raw_key in self._redis.scan_iter(match=f"{prefix}*"):
+            key = _text(raw_key)
+            consumer_id = key[len(prefix) :]
+            if consumer_id == self.consumer_id:
+                continue
+            if await self._redis.exists(self._heartbeat_key(consumer_id)):
+                continue
+            while True:
+                raw = await self._redis.lmove(key, self.processing_key, "RIGHT", "LEFT")
+                if raw is None:
+                    break
+                job_id = _text(raw)
+                await on_recover(job_id)
+                async with self._redis.pipeline(transaction=True) as pipe:
+                    pipe.lrem(self.processing_key, 1, job_id)
+                    pipe.rpush(self.name, job_id)  # dequeue pops from the right: next up
+                    await pipe.execute()
+                recovered.append(job_id)
+        return recovered
 
     async def aclose(self) -> None:
         if self._owns_client:

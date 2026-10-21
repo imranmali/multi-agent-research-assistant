@@ -14,9 +14,11 @@ from redis.asyncio import Redis
 
 from research_assistant.config import Settings, get_settings
 from research_assistant.jobs.executor import JobExecutor
-from research_assistant.jobs.queue import JobQueue, RedisJobQueue
+from research_assistant.jobs.queue import JobQueue, RecoverableJobQueue, RedisJobQueue
 from research_assistant.jobs.store import JobStore, RedisJobStore
 from research_assistant.logging import configure_logging, get_logger
+from research_assistant.metrics import JOBS_RECOVERED
+from research_assistant.models import EventType, JobStatus, ProgressEvent
 
 __all__ = ["Worker", "default_consumer_id", "main", "run_worker"]
 
@@ -51,6 +53,7 @@ class Worker:
         self.concurrency = concurrency or settings.worker_concurrency
         self.consumer_id = consumer_id or default_consumer_id()
         self.grace = settings.worker_shutdown_grace_seconds
+        self.heartbeat_interval = settings.worker_heartbeat_seconds
         self._dequeue_timeout = dequeue_timeout
         self._tasks: set[asyncio.Task[None]] = set()
         self._stop = asyncio.Event()
@@ -80,6 +83,11 @@ class Worker:
         logger.info("worker_started", consumer_id=self.consumer_id, concurrency=self.concurrency)
         self._finished.clear()
         stop_waiter = asyncio.create_task(self._stop.wait())
+        maintenance: asyncio.Task[None] | None = None
+        if isinstance(self.queue, RecoverableJobQueue):
+            # Announce liveness before taking any job, so nobody recovers our first one.
+            await self.queue.heartbeat(self._heartbeat_ttl)
+            maintenance = asyncio.create_task(self._maintain(self.queue))
         try:
             while not self._stop.is_set():
                 if len(self._tasks) >= self.concurrency:
@@ -101,8 +109,48 @@ class Worker:
         finally:
             stop_waiter.cancel()
             await self._drain()
+            if maintenance is not None:
+                maintenance.cancel()
+                await asyncio.gather(maintenance, return_exceptions=True)
+                if isinstance(self.queue, RecoverableJobQueue):
+                    with contextlib.suppress(Exception):
+                        await self.queue.clear_heartbeat()
             self._finished.set()
             logger.info("worker_stopped", consumer_id=self.consumer_id, processed=self.processed)
+
+    @property
+    def _heartbeat_ttl(self) -> float:
+        # Three missed beats before peers treat this worker as dead.
+        return self.heartbeat_interval * 3
+
+    async def _maintain(self, queue: RecoverableJobQueue) -> None:
+        """Heartbeat, and re-queue jobs held by workers that stopped heartbeating."""
+        while True:
+            try:
+                await queue.heartbeat(self._heartbeat_ttl)
+                recovered = await queue.recover_orphaned(self._requeue)
+                if recovered:
+                    logger.warning("worker_recovered_jobs", count=len(recovered), jobs=recovered)
+            except Exception:
+                logger.exception("worker_maintenance_error")
+            await asyncio.sleep(self.heartbeat_interval)
+
+    async def _requeue(self, job_id: str) -> None:
+        job = await self.store.get(job_id)
+        if job is None or job.status is not JobStatus.RUNNING:
+            return  # queued: will run normally; finished/missing: executor skips it
+        await self.store.update(
+            job.model_copy(update={"status": JobStatus.QUEUED, "started_at": None})
+        )
+        await self.store.append_event(
+            job_id,
+            ProgressEvent(
+                type=EventType.JOB_QUEUED,
+                stage="job",
+                message="Re-queued after the worker running it stopped responding",
+            ),
+        )
+        JOBS_RECOVERED.inc()
 
     async def _process(self, job_id: str) -> None:
         try:
