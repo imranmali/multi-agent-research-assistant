@@ -17,19 +17,15 @@ __all__ = ["InMemoryJobQueue", "JobQueue", "RecoverableJobQueue", "RedisJobQueue
 class JobQueue(Protocol):
     async def enqueue(self, job_id: str) -> None:
         """Add a job id to the tail of the queue."""
-        ...
 
     async def dequeue(self, timeout: float) -> str | None:  # noqa: ASYNC109
         """Take the next job id, waiting up to ``timeout`` seconds; ``None`` if none arrived."""
-        ...
 
     async def ack(self, job_id: str) -> None:
         """Mark a dequeued job id as processed."""
-        ...
 
     async def aclose(self) -> None:
         """Release resources."""
-        ...
 
 
 @runtime_checkable
@@ -38,15 +34,12 @@ class RecoverableJobQueue(JobQueue, Protocol):
 
     async def heartbeat(self, ttl_seconds: float) -> None:
         """Announce this consumer is alive for the next ``ttl_seconds``."""
-        ...
 
     async def clear_heartbeat(self) -> None:
         """Withdraw the liveness announcement (clean shutdown)."""
-        ...
 
     async def recover_orphaned(self, on_recover: Callable[[str], Awaitable[None]]) -> list[str]:
         """Re-queue ids held by consumers without a heartbeat, calling ``on_recover`` first."""
-        ...
 
 
 class InMemoryJobQueue:

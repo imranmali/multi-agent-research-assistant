@@ -122,7 +122,8 @@ async def test_cancel_on_b_before_pickup_is_skipped_by_worker(cluster: Cluster) 
     body = (await cluster.replica_a.get(f"/v1/research/{job_id}")).json()
     assert body["status"] == "cancelled"
     assert body["started_at"] is None
-    assert (await cluster.replica_a.delete(f"/v1/research/{job_id}")).status_code == 409
+    cancel = await cluster.replica_a.delete(f"/v1/research/{job_id}")
+    assert cancel.status_code == 409
 
 
 async def test_redis_service_reports_readiness(cluster: Cluster) -> None:

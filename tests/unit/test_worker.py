@@ -191,7 +191,7 @@ def test_metrics_port_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_main_requires_redis_backend(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(worker_module, "get_settings", lambda: make_settings())
+    monkeypatch.setattr(worker_module, "get_settings", make_settings)
     monkeypatch.setattr(worker_module, "configure_logging", lambda settings: None)
     with pytest.raises(SystemExit) as excinfo:
         worker_module.main()

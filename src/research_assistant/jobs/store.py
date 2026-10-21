@@ -29,39 +29,30 @@ __all__ = ["InMemoryJobStore", "JobStore", "RedisJobStore"]
 class JobStore(Protocol):
     async def create(self, job: ResearchJob) -> None:
         """Persist a new job."""
-        ...
 
     async def get(self, job_id: str) -> ResearchJob | None:
         """Return the job or ``None`` if unknown/expired."""
-        ...
 
     async def update(self, job: ResearchJob) -> ResearchJob:
         """Persist ``job`` (see module invariants); return the stored version."""
-        ...
 
     async def list(self, limit: int = 20, offset: int = 0) -> builtins.list[ResearchJob]:
         """Return jobs, newest first."""
-        ...
 
     async def append_event(self, job_id: str, event: ProgressEvent) -> int:
         """Append a progress event; return its zero-based index."""
-        ...
 
     async def events(self, job_id: str, since: int = 0) -> builtins.list[ProgressEvent]:
         """Return events with index ``>= since`` in order."""
-        ...
 
     async def request_cancel(self, job_id: str) -> ResearchJob | None:
         """Flag the job for cancellation (queued jobs become cancelled). ``None`` if unknown."""
-        ...
 
     async def ping(self) -> bool:
         """Whether the backing store is reachable."""
-        ...
 
     async def aclose(self) -> None:
         """Release resources."""
-        ...
 
 
 def _merge(stored: ResearchJob | None, incoming: ResearchJob) -> ResearchJob:
