@@ -18,6 +18,7 @@ __all__ = [
     "HTTP_REQUESTS",
     "HTTP_REQUEST_DURATION",
     "JOBS_FINISHED",
+    "JOBS_RECOVERED",
     "JOBS_RUNNING",
     "JOBS_SUBMITTED",
     "JOB_DURATION",
@@ -48,6 +49,11 @@ def _get_or_create(
 
 JOBS_SUBMITTED = _get_or_create(
     Counter, "research_jobs_submitted", "Research jobs accepted by the API."
+)
+JOBS_RECOVERED = _get_or_create(
+    Counter,
+    "research_jobs_recovered",
+    "Research jobs re-queued after the worker running them stopped heartbeating.",
 )
 JOBS_FINISHED = _get_or_create(
     Counter,

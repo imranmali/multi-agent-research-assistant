@@ -57,3 +57,16 @@ Stored jobs and their events SHALL expire after the configured retention period.
 #### Scenario: TTL applied
 - **WHEN** a job is stored with the Redis backend
 - **THEN** its keys carry an expiry equal to the configured retention period
+
+### Requirement: Crash recovery
+Workers SHALL publish a heartbeat, and live workers SHALL re-queue jobs held by a worker
+whose heartbeat has expired so that those jobs run to completion on another worker. A
+recovered job SHALL be visible to consumers only after its status is reset to `queued`.
+
+#### Scenario: Worker crashes mid-job
+- **WHEN** a worker dies while a job is `running` and another worker is alive
+- **THEN** within a few heartbeat intervals the job is re-queued, a `job_queued` event records the recovery, and the job reaches `completed`
+
+#### Scenario: Two workers recover concurrently
+- **WHEN** two live workers scan for orphaned jobs at the same time
+- **THEN** each orphaned job is re-queued exactly once

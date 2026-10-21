@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     job_ttl_seconds: int = Field(default=7 * 24 * 3600, ge=60)
     worker_concurrency: int = Field(default=2, ge=1, le=64)
     worker_shutdown_grace_seconds: float = Field(default=30.0, ge=0)
+    worker_heartbeat_seconds: float = Field(default=10.0, gt=0)
     queue_name: str = "research:queue"
 
     # --- API -----------------------------------------------------------------------

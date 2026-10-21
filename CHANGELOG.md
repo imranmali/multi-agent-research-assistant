@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     API replicas.
   - `research-worker` processes with bounded concurrency, cooperative cancellation, graceful
     SIGTERM shutdown and TTL-based retention.
+  - Heartbeat-based crash recovery: jobs held by a dead worker are re-queued and finished by a
+    surviving worker.
 - `research-assistant` CLI (`run`, `serve`, `worker`).
 - Structured JSON logging with request and job ids.
 - Multi-stage, non-root Docker image with a health check, and a Docker Compose stack (Redis,

@@ -34,10 +34,17 @@ proposal.md for motivation. Deployment target is containers (Docker / Kubernetes
 6. **Auth**: static API keys from `API_KEYS` (comma separated), compared in constant time.
 7. **App factory** `create_app(settings, store=None, runner=None)` for dependency injection in tests.
 
+8. **Crash recovery via heartbeats.** Each worker refreshes `{queue}:heartbeat:{consumer}`
+   (TTL = 3 × `WORKER_HEARTBEAT_SECONDS`) and periodically scans
+   `{queue}:processing:*`. For a consumer without a heartbeat, each id is claimed with
+   `LMOVE` into the scanner's own processing list (atomic, so concurrent scanners never
+   share an id), the job is reset `running → queued`, and only then the id is pushed back
+   to the head of the queue. Delivery is therefore at-least-once.
+
 ## Risks / Trade-offs
 
-- [Worker crash loses in-flight job] → job stays `running`; processing list allows a reaper
-  to re-queue (documented follow-up); jobs have TTL so they never leak.
+- [Worker paused longer than 3 heartbeats (e.g. stop-the-world) is treated as dead] → its
+  job may run twice; the store's terminal-state guard keeps the first finished result.
 - [SSE polling adds Redis load] → 0.5s interval and per-connection limits; fine for v1 scale.
 - [In-memory backend is single-process only] → `/readyz` and docs make it explicit; prod uses Redis.
 

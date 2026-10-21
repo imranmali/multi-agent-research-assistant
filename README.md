@@ -224,6 +224,7 @@ from a local `.env` file. [`.env.example`](.env.example) lists them all with the
 | `JOB_TTL_SECONDS` | `604800` | Retention of jobs and their events (default 7 days, min 60). |
 | `WORKER_CONCURRENCY` | `2` | Jobs one worker process runs at the same time (1–64). |
 | `WORKER_SHUTDOWN_GRACE_SECONDS` | `30` | How long a worker waits for running jobs after SIGTERM. |
+| `WORKER_HEARTBEAT_SECONDS` | `10` | Worker heartbeat interval; jobs of a worker silent for 3 intervals are re-queued. |
 | `QUEUE_NAME` | `research:queue` | Redis list used as the job queue. |
 | `WORKER_METRICS_PORT` | `9100` | Port of the worker's Prometheus metrics endpoint. |
 | **API** | | |
@@ -277,8 +278,12 @@ Interactive OpenAPI docs are served by FastAPI at `/docs`.
   - Keep the orchestrator's kill timeout above that value. The manifests use
     `terminationGracePeriodSeconds: 60` with a 45-second grace period, and Compose uses
     `stop_grace_period: 60s`.
-  - A job lost to a hard crash stays `running` until its TTL expires (at-most-once execution in
-    v1).
+- **Crash recovery.**
+  - Workers heartbeat every `WORKER_HEARTBEAT_SECONDS`. If a worker dies (OOM kill, node
+    loss), a surviving worker re-queues its in-flight jobs after three missed heartbeats and
+    they run to completion elsewhere (at-least-once delivery).
+  - Recoveries are logged (`worker_recovered_jobs`) and counted in
+    `research_jobs_recovered_total`.
 - **Timeouts.**
   - `ANTHROPIC_TIMEOUT_SECONDS` bounds each Claude call, and `ANTHROPIC_MAX_RETRIES` retries
     429/5xx with backoff.
@@ -326,6 +331,7 @@ Interactive OpenAPI docs are served by FastAPI at `/docs`.
     - `research_jobs_total{status}`
     - `research_job_duration_seconds{status}`
     - `research_jobs_running`
+    - `research_jobs_recovered_total`
   - Pods carry `prometheus.io/*` scrape annotations.
 - **Health.**
   - Kubernetes probes use `/readyz` for readiness (it fails while Redis is unreachable) and
