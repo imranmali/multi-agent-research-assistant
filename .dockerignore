@@ -1,0 +1,39 @@
+# Keep the build context small and free of secrets. The image only needs
+# pyproject.toml, README.md, LICENSE and src/.
+.git
+.github
+.claude
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+build
+dist
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+
+# Secrets / local config
+.env
+.env.*
+
+# Not needed in the image
+tests
+openspec
+deploy
+docs
+Dockerfile
+.dockerignore
+docker-compose.yml
+Makefile
+*.md
+!README.md
+
+# Editors / OS
+.idea
+.vscode
+.DS_Store
