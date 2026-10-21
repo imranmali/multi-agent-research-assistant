@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+import json
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LLMProvider = Literal["anthropic", "mock"]
 JobBackend = Literal["memory", "redis"]
@@ -49,8 +50,8 @@ class Settings(BaseSettings):
     queue_name: str = "research:queue"
 
     # --- API -----------------------------------------------------------------------
-    api_keys: list[str] = Field(default_factory=list)
-    cors_origins: list[str] = Field(default_factory=list)
+    api_keys: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     max_list_limit: int = Field(default=100, ge=1, le=1000)
     sse_poll_interval_seconds: float = Field(default=0.5, gt=0)
 
@@ -61,7 +62,7 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             stripped = value.strip()
             if stripped.startswith("["):
-                return value
+                return json.loads(stripped)
             return [item.strip() for item in stripped.split(",") if item.strip()]
         return value
 
