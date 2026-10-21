@@ -1,0 +1,68 @@
+# Local production-like stack: Redis + stateless API + 2 workers.
+#
+#   docker compose up --build              # mock provider, no API key needed
+#   LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-ant-... docker compose up --build
+#   docker compose up --scale worker=4     # more research throughput
+#
+# Values are interpolated from your shell and from ./.env (see .env.example).
+
+x-app-env: &app-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_JSON: ${LOG_JSON:-true}
+  LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+  # Passed through from the host only when set; never baked into the image.
+  ANTHROPIC_API_KEY:
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+  ANTHROPIC_EFFORT: ${ANTHROPIC_EFFORT:-medium}
+  JOB_BACKEND: redis
+  REDIS_URL: redis://redis:6379/0
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+
+x-app: &app
+  build:
+    context: .
+  image: ${IMAGE:-ghcr.io/imranmali/multi-agent-research-assistant:local}
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *app
+    environment:
+      <<: *app-env
+      # Passed through only when set (comma-separated keys); unset = auth disabled.
+      API_KEYS:
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  worker:
+    <<: *app
+    command: ["research-worker"]
+    environment:
+      <<: *app-env
+      WORKER_METRICS_PORT: "9100"
+      HEALTHCHECK_URL: http://127.0.0.1:9100/metrics
+    stop_grace_period: 60s
+    deploy:
+      replicas: 2
+
+volumes:
+  redis-data:

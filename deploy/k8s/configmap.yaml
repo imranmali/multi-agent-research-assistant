@@ -1,0 +1,41 @@
+# Non-secret configuration shared by the API and the workers.
+# Every key is an environment variable read by research_assistant.config.Settings
+# (see README "Configuration"); unset keys use the built-in defaults.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: research-assistant-config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  LOG_JSON: "true"
+
+  # Use "mock" for a keyless smoke deployment.
+  LLM_PROVIDER: "anthropic"
+  ANTHROPIC_MODEL: "claude-opus-5-5"
+  ANTHROPIC_EFFORT: "medium"
+  ANTHROPIC_MAX_TOKENS: "16000"
+  ANTHROPIC_TIMEOUT_SECONDS: "600"
+  ANTHROPIC_MAX_RETRIES: "3"
+  ANTHROPIC_ENABLE_FALLBACKS: "true"
+  MAX_SEARCH_USES: "5"
+
+  MAX_SUBQUESTIONS: "4"
+  MAX_PARALLEL_RESEARCH: "4"
+  MAX_REVISIONS: "1"
+
+  # Shared job store + queue. Point at a managed / HA Redis in production.
+  JOB_BACKEND: "redis"
+  REDIS_URL: "redis://redis:6379/0"
+  JOB_TTL_SECONDS: "604800"
+  QUEUE_NAME: "research:queue"
+  WORKER_CONCURRENCY: "2"
+  WORKER_SHUTDOWN_GRACE_SECONDS: "45"
+  WORKER_HEARTBEAT_SECONDS: "10"
+  WORKER_METRICS_PORT: "9100"
+
+  MAX_LIST_LIMIT: "100"
+  SSE_POLL_INTERVAL_SECONDS: "0.5"
+
+  # Pods are only reachable through the Service / Ingress, so trust X-Forwarded-* from it.
+  FORWARDED_ALLOW_IPS: "*"

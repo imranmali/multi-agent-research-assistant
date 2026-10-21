@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  # CI never talks to a real LLM: the mock provider is deterministic and offline.
+  LLM_PROVIDER: mock
+  FORCE_COLOR: "1"
+
+jobs:
+  lint:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check --output-format=github src tests
+
+      - name: Ruff format
+        run: ruff format --check src tests
+
+      - name: Mypy
+        run: mypy
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Pytest
+        if: matrix.python-version != '3.12'
+        run: pytest
+
+      - name: Pytest with coverage gate (>= 85%)
+        if: matrix.python-version == '3.12'
+        run: >-
+          pytest
+          --cov=research_assistant
+          --cov-report=xml
+          --cov-report=term
+          --cov-fail-under=85
+
+      - name: Upload coverage report
+        if: matrix.python-version == '3.12' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  openspec:
+    name: OpenSpec validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install OpenSpec CLI
+        run: npm install -g @fission-ai/openspec@1.14.3
+
+      - name: Validate specs and changes
+        run: openspec validate --all --strict --no-interactive
+
+  docker:
+    name: Docker build & smoke test
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: research-assistant:ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image runs as non-root and ships the worker entrypoint
+        run: |
+          user="$(docker image inspect --format '{{.Config.User}}' "$IMAGE")"
+          echo "Image user: ${user}"
+          case "$user" in ""|0|0:*|root|root:*) echo "::error::image runs as root"; exit 1;; esac
+          docker run --rm "$IMAGE" python -c \
+            "import shutil, sys; sys.exit(0 if shutil.which('research-worker') else 1)"
+
+      - name: Start API container (mock provider)
+        run: |
+          docker run -d --name app -p 8000:8000 \
+            -e LLM_PROVIDER=mock -e LOG_JSON=true \
+            "$IMAGE"
+
+      - name: Wait for /healthz (max 30s)
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz; then
+              echo
+              echo "healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::/healthz did not respond 200 within 30 seconds"
+          exit 1
+
+      - name: Submit research job (expect 202)
+        run: |
+          status="$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:8000/v1/research \
+            -H 'Content-Type: application/json' \
+            -d '{"question": "What is the state of solid-state batteries?"}')"
+          cat response.json; echo
+          if [ "$status" != "202" ]; then
+            echo "::error::POST /v1/research returned ${status}, expected 202"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8000/readyz; echo
+
+      - name: Container logs
+        if: failure()
+        run: docker logs app || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f app || true

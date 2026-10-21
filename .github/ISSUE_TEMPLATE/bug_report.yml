@@ -1,0 +1,77 @@
+name: Bug report
+description: Something is not working as documented.
+title: "bug: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **do not** include API keys or other secrets.
+        Security issues: follow SECURITY.md instead of opening a public issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal commands or requests (curl, CLI) that reproduce the problem.
+      placeholder: |
+        1. LLM_PROVIDER=mock research-assistant serve
+        2. curl -X POST localhost:8000/v1/research -d '{"question": "..."}'
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it?
+      options:
+        - Local (pip / venv)
+        - Docker / docker compose
+        - Kubernetes (deploy/k8s)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM provider
+      options:
+        - mock
+        - anthropic
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Job backend
+      options:
+        - memory
+        - redis
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / image tag
+      placeholder: "1.0.0 or ghcr.io/imranmali/multi-agent-research-assistant:sha-abc1234"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Include the request id (`X-Request-ID`) if you have one. Logs are rendered as code.
+      render: shell

@@ -1,0 +1,27 @@
+# Optional: enable it in kustomization.yaml after setting host, class and TLS secret.
+# SSE (/v1/research/{id}/events) needs proxy buffering off and a long read timeout.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: research-api
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    # cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [research.example.com]
+      secretName: research-api-tls
+  rules:
+    - host: research.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: research-api
+                port:
+                  name: http
